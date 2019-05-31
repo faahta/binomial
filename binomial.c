@@ -10,13 +10,12 @@ int n,k,result;
 
 typedef struct numerator{
 	long numer;
-	sem_t *semNum;
+	pthread_mutex_t lock;
+	pthread_cond_t cond;
 }numerator_t;
 
 typedef struct denominator{
 	long denom;
-	pthread_mutex_t lock;
-	pthread_cond_t cond;
 	int done;
 }denominator_t;
 
@@ -41,12 +40,12 @@ static void * numer_thread(void * arg){
 				numerator.numer = numerator.numer * (i*(i-1));
 		}
 	}
-	pthread_mutex_lock(&denominator.lock);
+	pthread_mutex_lock(&numerator.lock);
 	while(denominator.done == 0){
-		pthread_cond_wait(&denominator.cond, &denominator.lock);	
+		pthread_cond_wait(&numerator.cond, &numerator.lock);	
 	}
 	result = numerator.numer / denominator.denom;	
-	pthread_mutex_unlock(&denominator.lock);
+	pthread_mutex_unlock(&numerator.lock);
 	return NULL;	
 }
 
@@ -69,19 +68,16 @@ static void * denom_thread(void * arg){
 		}	
 	}
 	denominator.done = 1;
-	pthread_cond_signal(&denominator.cond);	
+	pthread_cond_signal(&numerator.cond);	
 	return NULL;
 }
 
 void init(){
 	numerator.numer = 1;
-	numerator.semNum = (sem_t *)malloc(sizeof(sem_t));
-	sem_init(numerator.semNum, 0, 0);
 	denominator.denom = 1;
-	pthread_mutex_init(&denominator.lock, NULL);
-	pthread_cond_init(&denominator.cond, NULL);
+	pthread_mutex_init(&numerator.lock, NULL);
+	pthread_cond_init(&numerator.cond, NULL);
 	denominator.done = 0;
-	numerator.done = 0;
 }
 
 int main(int argc, char *argv[]){
